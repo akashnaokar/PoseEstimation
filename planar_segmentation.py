@@ -12,7 +12,7 @@ plane_model, inliers = scene_pcd.segment_plane(distance_threshold=0.2,  # try 0.
                                          num_iterations=1000)
 
 table = scene_pcd.select_by_index(inliers)
-o3d.visualization.draw_geometries([table], window)
+o3d.visualization.draw_geometries([table], window_name="Table")
 objects = scene_pcd.select_by_index(inliers, invert=True)
 
 labels = np.array(objects.cluster_dbscan(eps=0.03, min_points=30))  # Adjust eps based on box size
@@ -23,13 +23,12 @@ colors = plt.get_cmap("tab20")(labels / (max_label + 1 if max_label >= 0 else 1)
 colors[labels < 0] = 0  # For noise/unclustered points
 objects.colors = o3d.utility.Vector3dVector(colors[:, :3])
 
-o3d.visualization.draw_geometries([objects])
+o3d.visualization.draw_geometries([objects], window_name="Objects after Filtering")
 
 target_cluster_idx = 0  # Change based on what you observe visually
 box_pcd = objects.select_by_index(np.where(labels == target_cluster_idx)[0])
 
 # Visualize the box alone
-o3d.visualization.draw_geometries([box_pcd])
+o3d.visualization.draw_geometries([box_pcd], window_name="Box Top Surface")
 
-# Optional: Save the extracted box model for reuse
-# o3d.io.write_point_cloud("data/box_model_extracted.pcd", box_pcd)
+o3d.io.write_point_cloud("data/box_model_extracted.pcd", box_pcd)
