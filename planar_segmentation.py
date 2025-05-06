@@ -7,11 +7,12 @@ scene_pcd = o3d.io.read_point_cloud("data/stage.pcd")
 scene_pcd.estimate_normals(search_param=o3d.geometry.KDTreeSearchParamHybrid(radius=0.02, max_nn=30))
 
 
-plane_model, inliers = scene_pcd.segment_plane(distance_threshold=0.2,  # try 0.005–0.02 based on noise
+plane_model, inliers = scene_pcd.segment_plane(distance_threshold=0.18,  # try 0.005–0.02 based on noise
                                          ransac_n=3,
                                          num_iterations=1000)
 
 table = scene_pcd.select_by_index(inliers)
+o3d.io.write_point_cloud("data/table.pcd", table)
 o3d.visualization.draw_geometries([table], window_name="Table")
 objects = scene_pcd.select_by_index(inliers, invert=True)
 

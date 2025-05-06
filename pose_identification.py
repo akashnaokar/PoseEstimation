@@ -6,10 +6,13 @@ import copy
 
 # Load point clouds
 scene_pcd = o3d.io.read_point_cloud("data/stage.pcd")
-box_pcd = o3d.io.read_point_cloud("data/box_model_extracted.pcd")
+box_pcd_full = o3d.io.read_point_cloud("data/box_model_extracted.pcd")
+table_pcd = o3d.io.read_point_cloud("data/table.pcd")
+box_pcd = box_pcd_full.voxel_down_sample(voxel_size=0.01)
+
 
 # Estimate normals for the scene
-scene_pcd.estimate_normals(search_param=o3d.geometry.KDTreeSearchParamHybrid(radius=0.02, max_nn=30))
+scene_pcd.estimate_normals(search_param=o3d.geometry.KDTreeSearchParamHybrid(radius=0.3, max_nn=30))
 
 # Step 1: Compute PCA-based Oriented Bounding Box (OBB) for the box
 points = np.asarray(box_pcd.points)
@@ -26,6 +29,46 @@ projected = np.dot(points - mean, eigenvectors)
 min_bound = np.min(projected, axis=0)
 max_bound = np.max(projected, axis=0)
 extent = max_bound - min_bound
+# Refine orientation using normals
+# if not box_pcd.has_normals():
+print("Estimating normals for the isolated box_pcd...")
+box_pcd.estimate_normals(search_param=o3d.geometry.KDTreeSearchParamHybrid(radius=0.03, max_nn=30))
+o3d.visualization.draw_geometries([box_pcd], point_show_normal=True)
+
+normals = np.asarray(box_pcd.normals)
+abs_normals = np.abs(normals)
+
+# Find points where one normal component dominates (likely on flat faces)
+x_dominant = (abs_normals[:, 0] > 0.9)
+y_dominant = (abs_normals[:, 1] > 0.9)
+z_dominant = (abs_normals[:, 2] > 0.9)
+
+min_face_points = 100  # Minimum points needed for reliable orientation
+axes_refined = 0
+refined_eigenvectors = eigenvectors.copy()
+
+for i, dominant in enumerate([x_dominant, y_dominant, z_dominant]):
+    if np.sum(dominant) > min_face_points:
+        # Get the average normal for this face
+        face_normals = normals[dominant]
+        avg_normal = np.mean(face_normals, axis=0)
+        avg_normal = avg_normal / np.linalg.norm(avg_normal)
+        
+        # Use this normal for the corresponding axis
+        refined_eigenvectors[:, i] = avg_normal * np.sign(np.dot(avg_normal, eigenvectors[:, i]))
+        axes_refined += 1
+
+# If we refined at least two axes, ensure orthogonality
+if axes_refined >= 2:
+    # Ensure orthogonality with cross product
+    refined_eigenvectors[:, 1] = np.cross(refined_eigenvectors[:, 2], refined_eigenvectors[:, 0])
+    refined_eigenvectors[:, 1] /= np.linalg.norm(refined_eigenvectors[:, 1])
+    
+    # Ensure the third vector forms a right-handed system
+    refined_eigenvectors[:, 2] = np.cross(refined_eigenvectors[:, 0], refined_eigenvectors[:, 1])
+    refined_eigenvectors[:, 2] /= np.linalg.norm(refined_eigenvectors[:, 2])
+    
+    eigenvectors = refined_eigenvectors
 
 box_obb = o3d.geometry.OrientedBoundingBox()
 box_obb.center = mean
@@ -55,9 +98,9 @@ for _ in range(max_planes):
         num_iterations=500
     )
     inlier_cloud = remaining_pcd.select_by_index(inliers)
-    print(len(inlier_cloud.points))
-    inlier_cloud.paint_uniform_color([0.8, 0.8, 0.8])  # Light gray
-    o3d.visualization.draw_geometries([inlier_cloud], window_name="Planes")
+    # print(len(inlier_cloud.points))
+    # inlier_cloud.paint_uniform_color([0.8, 0.8, 0.8])  # Light gray
+    # o3d.visualization.draw_geometries([inlier_cloud], window_name="Planes")
     remaining_pcd = remaining_pcd.select_by_index(inliers, invert=True)
 
     if len(inlier_cloud.points) < 15000:
@@ -112,7 +155,7 @@ full_box_height = visible_box_height + distance_to_plane
 corrected_extent = np.copy(extent)
 corrected_extent[gravity_axis] = full_box_height
 
-print(f"Corrected box dimensions (WxHxD): {corrected_extent[0]*100:.2f} x {corrected_extent[1]*100:.2f} x {corrected_extent[2]*100:.2f} cm")
+print(f"Corrected box dimensions (WxHxD): {corrected_extent[0]*1000:.2f} x {corrected_extent[1]*1000:.2f} x {corrected_extent[2]*1000:.2f} mm")
 
 # Step 7: Create corrected box and transform it
 corrected_box = o3d.geometry.TriangleMesh.create_box(
@@ -121,7 +164,7 @@ corrected_box = o3d.geometry.TriangleMesh.create_box(
     depth=corrected_extent[2]
 )
 corrected_box.compute_vertex_normals()
-corrected_box.paint_uniform_color([0.75, 1, 0.75])
+corrected_box.paint_uniform_color([0.25, 0.25, 0.25])
 corrected_box.translate(-corrected_extent / 2)
 
 corrected_box_transform = np.eye(4)
@@ -129,6 +172,9 @@ corrected_box_transform[:3, :3] = box_obb.R
 corrected_box_center = table_point + (corrected_extent[gravity_axis] / 2) * plane_normal
 corrected_box_transform[:3, 3] = corrected_box_center
 corrected_box.transform(corrected_box_transform)
+
+print("Box pose in camera frame:")
+print(corrected_box_transform)
 
 # Step 8: Save and visualize
 np.save("data/box_dimensions_corrected.npy", corrected_extent)
@@ -140,6 +186,7 @@ coordinate_frame = o3d.geometry.TriangleMesh.create_coordinate_frame(size=0.2, o
 best_plane.paint_uniform_color([0.8, 0.8, 0.8])  # Visualize selected plane
 
 # Visualize
+table_pcd.paint_uniform_color([1, 0.5, 0])
 o3d.visualization.draw_geometries([
     box_pcd, 
     best_plane,
@@ -150,7 +197,7 @@ o3d.visualization.draw_geometries([
 ], window_name="Box to Table Distance")
 
 o3d.visualization.draw_geometries([
-    scene_pcd,
+    table_pcd,
     corrected_box,
     coordinate_frame
 ], window_name="Corrected Box in Scene")
