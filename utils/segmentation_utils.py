@@ -47,6 +47,7 @@ def segment_table_and_objects(scene_path: str,
         o3d.io.write_point_cloud(table_save_path, table)
         print(f"Saved table point cloud to {table_save_path}")
     if visualize:
+        table.paint_uniform_color([0.8, 0.8, 0.8])
         o3d.visualization.draw_geometries([table], window_name="Segmented Table")
 
     # Object clustering using DBSCAN

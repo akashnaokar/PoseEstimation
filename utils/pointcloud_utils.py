@@ -51,10 +51,10 @@ def generate_pointcloud_from_npy(color_path: str, depth_path: str,
     # Optionally show the RGBD images
     if visualize:
         plt.subplot(1, 2, 1)
-        plt.title("Color Image Normalized")
+        plt.title("Color Image")
         plt.imshow(image.color)
         plt.subplot(1, 2, 2)
-        plt.title("Depth Image (float) in meters")
+        plt.title("Depth Map")
         plt.imshow(image.depth)
         plt.show()
 
