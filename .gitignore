@@ -1,5 +1,18 @@
+# Environments
+.env
 .venv
+env/
+venv/
 
-__pycache__
+#Byte-compiled
+__pycache__/
 
+# Output directory
 /output_data
+
+# Point cloud files
+*.pcd
+
+# Custom files
+*corrected.npy
+
