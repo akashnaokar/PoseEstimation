@@ -111,7 +111,7 @@ def compute_corrected_box_pose_and_dimensions(
     plane_normal = plane_normal / np.linalg.norm(plane_normal)
     print(f"Selected plane #{best_plane_idx} with normal {plane_normal} and distance {min_dist:.4f} m")
 
-    # Step 5: Distance from box bottom to table
+    # Distance from box bottom to table
     distance_to_plane = abs(np.dot(plane_normal, box_bottom_center) + d)
     print(f"Distance from box bottom to table: {distance_to_plane:.4f} m")
 
@@ -127,7 +127,7 @@ def compute_corrected_box_pose_and_dimensions(
     line_set.lines = o3d.utility.Vector2iVector([[0, 1]])
     line_set.colors = o3d.utility.Vector3dVector([[1, 0, 0]])
 
-    # Step 6: Adjust height and recompute corrected box extent
+    # Adjust height and recompute corrected box extent
     visible_box_height = extent[gravity_axis]
     full_box_height = visible_box_height + distance_to_plane
     corrected_extent = np.copy(extent)
@@ -135,7 +135,7 @@ def compute_corrected_box_pose_and_dimensions(
 
     print(f"Corrected box dimensions (WxHxD): {corrected_extent[0]*1000:.2f} x {corrected_extent[1]*1000:.2f} x {corrected_extent[2]*1000:.2f} mm")
 
-    # Step 7: Create corrected box and transform it
+    # Create corrected box and transform it
     corrected_box = o3d.geometry.TriangleMesh.create_box(
         width=corrected_extent[0],
         height=corrected_extent[1],
@@ -151,8 +151,8 @@ def compute_corrected_box_pose_and_dimensions(
     corrected_box_transform[:3, 3] = corrected_box_center
     corrected_box.transform(corrected_box_transform)
 
-    print("Box pose in camera frame:")
-    print(corrected_box_transform)
+    # print("Box pose in camera frame:")
+    # print(corrected_box_transform)
 
     # Save results
     np.save(f"{save_dir}/box_dimensions_corrected.npy", corrected_extent)
@@ -160,7 +160,7 @@ def compute_corrected_box_pose_and_dimensions(
 
     print("Saved corrected box dimensions and pose.")
     print(f"Corrected box dimensions (m): {corrected_extent}")
-    print(f"Box pose:\n{corrected_box_transform}")
+    print(f"Box pose in camera frame::\n{corrected_box_transform}")
     
     coordinate_frame = o3d.geometry.TriangleMesh.create_coordinate_frame(size=0.2, origin=[0, 0, 0])
     best_plane.paint_uniform_color([0.8, 0.8, 0.8])  # Visualize selected plane 
